@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=windows-1252">
+<title>fps</title>
+<script>
+var ctx;
+var drawable_obj_list=new Array();
+var drawable_obj_list_gui=new Array();
+var enemy_list_wave=new Array();
+var player;
+var static_borders=new Array();
+var static_corners=new Array();
+var static_corner_connections;
+var bullet_list=new Array();
+var FPS=30;
+var t=0;
+var t2=0;
+var myTimer;
+var is_mouse_down=false;
+var creating=true;
+function drawable_obj(drawtype, xpos, ypos, width, height, color, image, iswalkable, iscloakable, isvisible, istransparent, isstatic,isforground){
+	this.isforground=isforground;//only for static elements
+	this.drawtype = drawtype;
+	this.xpos = xpos;//left bottom corner
+	if (drawtype=="rect"){//for level creating -> reverse y coords
+		this.ypos = 585-ypos-height;
+	}else{
+		this.ypos = 585-ypos;
+	}
+	this.width=width;//width is r in circle
+	this.height=height;
+	this.color=color;
+	this.iswalkable=iswalkable
+	this.iscloakable=iscloakable;//can it be out of sight
+	this.isvisible=isvisible;
+	this.istransparent=istransparent;//can look through
+	this.isstatic=isstatic;//true-> in draw in background
+}
+function player(name,hp,dps,speed,image,bullet_image,bullet_time,bullet_speed){
+	this.isdead=false;
+	this.name=name;
+	this.hp=hp;
+	this.speed=speed;
+	this.image=image;
+	this.moving=false;
+	this.move_direction=[0,0];
+	this.size=15;
+	this.isinvincible=false;
+	this.isinvincible_time=0;
+	drawable_obj_list.push(
+		new drawable_obj("arc", 600, 270,this.size,this.size, "#444444", image,true, false, true, false, false,false)
+	);
+	this.drawable_obj_list_pos=drawable_obj_list.length-1;
+	//life
+	drawable_obj_list_gui.push(
+		new drawable_obj("rect", 4, 559,102,22, "#ffffff", "none",true, false, true, false, false,true)
+	);
+	drawable_obj_list_gui.push(
+		new drawable_obj("rect", 5, 560,100,20, "#ff0000", "none",true, false, true, false, false,true)
+	);
+	this.drawable_obj=function (){return drawable_obj_list[this.drawable_obj_list_pos]};
+	this.bullet_time=bullet_time;
+	this.bullet_time_delta=0;
+	this.bullet_image=bullet_image;
+	this.bullet_speed=bullet_speed;
+	this.bullet_mod=[0];
+	this.bullet_setup=function(deltatime,start_xpos,start_ypos,m,xdir){
+		this.bullet_time_delta-=deltatime;
+		if (this.bullet_time_delta<-this.bullet_time){
+			this.bullet_time_delta=0;
+		}
+		if (this.bullet_time_delta<=0){
+			this.bullet_time_delta+=this.bullet_time;
+			var bullet_speed=this.bullet_speed;
+			this.bullet_mod.forEach(function(element){
+					bullet_list.push(
+						new bullet(true,this.bullet_image,start_xpos,start_ypos,6,bullet_speed,m,xdir,0)
+					);
+			});
+		}
+	}
+}
+function enemy(name,hp,dps,speed,image, isrange,size, spawntime,xpos,ypos,min_xdiff,min_ydiff,bullet_image,bullet_time,bullet_speed,bullet_mod){
+	this.drawtype="arc";
+	this.isdead=false;
+	this.name=name;
+	this.hp=hp;
+	this.speed=speed;
+	this.image=image;
+	this.isrange=isrange;
+	this.size=size;
+	this.isinvincible=false;
+	this.spawntime=spawntime;
+	this.move_path=[-1];
+	this.path_index=0;
+	this.player_corner=-1;
+	this.min_xdiff=min_xdiff;
+	this.min_ydiff=min_ydiff;
+	drawable_obj_list.push(
+		new drawable_obj("none", xpos, ypos,size,size, "#bd3e3e", image,true, true, true, false, false,false)
+	);
+	this.drawable_obj_list_pos=drawable_obj_list.length-1;
+	this.drawable_obj=function (){return drawable_obj_list[this.drawable_obj_list_pos]};
+	this.bullet_time=bullet_time;
+	this.bullet_time_delta=0;
+	this.bullet_image=bullet_image;
+	this.bullet_speed=bullet_speed;
+	this.bullet_mod=bullet_mod;
+	this.bullet_setup=function(deltatime,start_xpos,start_ypos,m,xdir){
+		if (this.isrange){
+			this.bullet_time_delta-=deltatime;
+			if (this.bullet_time_delta<-this.bullet_time){
+				this.bullet_time_delta=0;
+			}
+			if (this.bullet_time_delta<=0){
+				this.bullet_time_delta+=this.bullet_time;
+				var bullet_speed=this.bullet_speed;
+				this.bullet_mod.forEach(function(element){
+						bullet_list.push(
+							new bullet(false,this.bullet_image,start_xpos,start_ypos,6,bullet_speed,m,xdir,element)
+						);
+				});
+			}
+		}
+	}
+}
+function bullet(owner,image,xpos,ypos,size,speed,m,xdir,mod){
+	this.isplayer_owner=owner;
+	this.size=size;
+	this.image=image;
+	this.speed=speed;
+	switch(mod){
+		case 0:
+			this.x=1;
+			this.y=this.x*m;
+		break;
+		case 1:
+			this.x=1;
+			this.y=0;
+		break;
+		case 2:
+			this.x=0;
+			if (m==0){m=1;}
+			this.y=1*m/Math.abs(m);
+		break;
+		case 3:
+			this.x=1;
+			if (m==0){m=1;}
+			this.y=1*m/Math.abs(m);
+		break;
+		case 4:
+			this.x=xdir;
+			this.y=xdir;
+		break;
+		case 5:
+			this.x=-xdir;
+			this.y=xdir;
+		break;
+		case 6:
+			this.x=-xdir;
+			this.y=-xdir;
+		break;
+		case 7:
+			this.x=xdir;
+			this.y=-xdir;
+		break;
+		case 8:
+			this.x=xdir;
+			this.y=0;
+		break;
+		case 9:
+			this.x=-xdir;
+			this.y=0;
+		break;
+		case 10:
+			this.x=0;
+			this.y=-xdir;
+		break;
+		case 11:
+			this.x=0;
+			this.y=xdir;
+		break;
+	}
+	this.dist=xdir*Math.pow(Math.pow(this.y,2)+Math.pow(this.x,2),0.5);
+	drawable_obj_list.push(
+		new drawable_obj("arc", xpos, 585-ypos,size,size, "#ffffff", image,true, true, true, false, false,false)
+	);
+	this.drawable_obj_list_pos=drawable_obj_list.length-1;
+	this.drawable_obj=function (){return drawable_obj_list[this.drawable_obj_list_pos]};
+	this.handler_x=0;
+	this.handler_y=0;
+	this.handler_prex=0;
+	this.handler_prey=0;
+	this.handler_aftx=0;
+	this.handler_afty=0;
+	this.handler=function (deltatime){
+		this.handler_x=this.x*(this.speed/1000*deltatime)/this.dist;
+		this.handler_y=this.y*(this.speed/1000*deltatime)/this.dist;
+		this.handler_prex=this.drawable_obj().xpos;
+		this.handler_prey=this.drawable_obj().ypos;
+		this.drawable_obj().xpos+=this.handler_x;
+		this.drawable_obj().ypos+=this.handler_y;
+		this.handler_aftx=this.drawable_obj().xpos;
+		this.handler_afty=this.drawable_obj().ypos;
+		if (this.handler_aftx<0 || this.handler_aftx > 780 || this.handler_afty<0 || this.handler_afty > 585){
+			drawable_obj_list.splice(this.drawable_obj_list_pos,1);
+			return true;
+		}else{
+			return false;
+		}
+	};
+	
+	this.hit_test=function (target_xpos,target_ypos,target_size,target_hp){
+		var prex=this.handler_prex;var prey=this.handler_prey;var aftx=this.handler_aftx;var afty=this.handler_afty;var x=this.handler_x;var y=this.handler_y;
+		var rel_xpos=Math.abs(target_ypos-prey)/y*this.x;
+		var rel_ypos=Math.abs(target_xpos-prex)/x*this.y;
+		if((((prex-(target_xpos-target_size))*(aftx-(target_xpos-target_size))<=0 || (prex-(target_xpos+target_size))*(aftx-(target_xpos+target_size))<=0)
+			&& ((rel_ypos+prey)>=(target_ypos-target_size)) && ((rel_ypos+prey)<=(target_ypos+target_size))) ||
+			(((prey-(target_ypos-target_size))*(afty-(target_ypos-target_size))<=0 || (prey-(target_ypos+target_size))*(afty-(target_ypos+target_size))<=0)
+			&& ((rel_xpos+prex)>=(target_xpos-target_size)) && ((rel_xpos+prex)<=(target_xpos+target_size))) || 
+			(aftx<(target_xpos+target_size) && aftx>(target_xpos-target_size) && afty<(target_ypos+target_size) && afty>(target_ypos-target_size))){
+			target_hp-=10;
+		}
+		return target_hp;
+	};
+}
+function init(){
+	ctx=document.getElementById("gamecanvas").getContext("2d");
+	ctx_bg=document.getElementById("gamecanvas_bg").getContext("2d");
+	ctx_fg=document.getElementById("gamecanvas_fg").getContext("2d");
+	ctx_gui=document.getElementById("gamecanvas_gui").getContext("2d");
+	if (window.addEventListener){
+		window.addEventListener("keydown", keydown, false);
+		window.addEventListener("keyup", keyup, false);
+		document.addEventListener("mousemove", mousemove);
+		document.addEventListener("mousedown", mousedown);
+		document.addEventListener("mouseup", mouseup);
+	}else if (window.attachEvent){
+		window.attachEvent("onkeydown", keydown);
+		window.attachEvent("onkeyup", keyup);
+		window.attachEvent("onmousemove", mousemove);
+		window.attachEvent("onmousedown", mousedown);
+		window.attachEvent("onmouseup", mouseup);
+	}
+	//this is me \/ :)
+	player=new player("ka",100,10,200,"none","none",1000,250);
+	lvl1();
+	t=performance.now();
+	myTimer=setInterval(draw, 1000/FPS);
+}
+function remove_old_lvl(){
+	drawable_obj_list=drawable_obj_list.splice(0,3);
+	enemy_list_wave=[];
+	static_borders=[];
+}
+function prepare_pathfinding(){
+	//get all static borders and corners
+	var char_w=player.drawable_obj().width;
+	drawable_obj_list.forEach(function(element){
+		if(element.isstatic && !element.iswalkable){
+			static_borders.push([element.xpos,element.ypos,element.xpos+element.width,element.ypos+element.height,element.istransparent]);//unten,links,oben,rechts
+			static_corners.push([element.xpos,element.ypos,-1,-1]);
+			static_corners.push([element.xpos+element.width,element.ypos,1,-1]);
+			static_corners.push([element.xpos+element.width,element.ypos+element.height,1,1]);
+			static_corners.push([element.xpos,element.ypos+element.height,-1,1]);
+		}
+	});
+	//get direct connections
+	char_w=14;
+	var direct_corner_conections=new Array();
+	static_corner_connections=new Array(static_corners.length);
+	var s=-1;
+	static_corners.forEach(function(start){
+		s++;
+		var t=-1;
+		static_corner_connections[s]=new Array(static_corners.length);
+		direct_corner_conections.push(new Array());
+		static_corners.forEach(function(target){
+			t++;
+			static_corner_connections[s][t]=[999999,[t]];
+			var target_x=target[0]+target[2]*char_w;
+			var target_y=target[1]+target[3]*char_w;
+			var start_x=start[0]+start[2]*(char_w+0.000001);
+			var start_y=start[1]+start[3]*(char_w+0.000001);
+			var dist=[target_x-start_x,target_y-start_y];//dist in x and y
+			var k=0;
+			var temp_vision=true;
+			for(k=0;k<static_borders.length;k++){
+				if(dist[0]!=0){
+					if (dist[0]>0){
+						var r=(static_borders[k][0]-char_w-start_x)/dist[0];
+						var y=r*dist[1]+start_y;
+						if ((y>=static_borders[k][1]-char_w) && (y<=static_borders[k][3]+char_w) && r<1 && r>=0){
+							temp_vision=false;
+						}
+					}else{
+						var r=(static_borders[k][2]+char_w-start_x)/dist[0];
+						var y=r*dist[1]+start_y;
+						if ((y>=static_borders[k][1]-char_w) && (y<=static_borders[k][3]+char_w) && r<1 && r>=0){
+							temp_vision=false;
+						}
+					}
+				}
+				if(dist[1]!=0){
+					if(dist[1]>0){
+						var r=(static_borders[k][1]-char_w-start_y)/dist[1];
+						var x=r*dist[0]+start_x;
+						if ((x>=static_borders[k][0]-char_w) && (x<=static_borders[k][2]+char_w) && r<1 && r>=0){
+							temp_vision=false;
+						}
+					}else{
+						var r=(static_borders[k][3]+char_w-start_y)/dist[1];
+						var x=r*dist[0]+start_x;
+						if ((x>=static_borders[k][0]-char_w) && (x<=static_borders[k][2]+char_w) && r<1 && r>=0){
+							temp_vision=false;
+						}
+					}
+				}
+			}
+			if(temp_vision){
+				var start_x=start[0]+start[2]*(char_w);
+				var start_y=start[1]+start[3]*(char_w);
+				var dist=[target_x-start_x,target_y-start_y];//dist in x and y
+				dist_hypo=Math.pow(Math.pow(Math.abs(dist[0]),2)+Math.pow(Math.abs(dist[1]),2),0.5);
+				direct_corner_conections[s].push([t,dist_hypo]);
+			}
+		});
+	});
+	//get shortest path from every to every point and distance
+	function search(pre_knots,dist,start_knot){
+		var last_knot=pre_knots[pre_knots.length-1];
+		direct_corner_conections[last_knot].forEach(function (element){
+			if (dist+element[1]<static_corner_connections[start_knot][element[0]][0] && start_knot!=element[0]){
+				pre_knots.push(element[0]);
+				pre_knotsr=pre_knots.slice();
+				static_corner_connections[start_knot][element[0]][0]=dist+element[1];
+				static_corner_connections[start_knot][element[0]][1]=pre_knotsr;
+				search(pre_knotsr,dist+element[1],start_knot);
+				pre_knots.splice(-1);
+			}
+		});
+	}
+	for (k=0;k<static_corners.length;k++){
+		search([k],0,k);
+		static_corner_connections[k][k][0]=0;
+	}
+}
+function lvl1(){
+	remove_old_lvl();
+	//street 780x585
+	drawable_obj_list.push(
+		new drawable_obj("rect", 0, 160,780,225, "#bd7a3e", "none",true, false, true, false, true,false)
+	);
+	//buildings
+	drawable_obj_list.push(
+		new drawable_obj("rect", 0, 425,210,160, "#444caa", "none",false, false, true, false, true,true)
+	);
+	//innerwall
+	drawable_obj_list.push(
+		new drawable_obj("rect", 260, 565,260,10, "#004c00", "none",false, false, true, false, true,false)
+	);
+	drawable_obj_list.push(
+		new drawable_obj("rect", 250, 435,10,140, "#004c00", "none",false, false, true, false, true,false)
+	);
+	drawable_obj_list.push(
+		new drawable_obj("rect", 510, 435,10,140, "#004c00", "none",false, false, true, false, true,false)
+	);
+	drawable_obj_list.push(
+		new drawable_obj("rect", 320, 435,50,10, "#004c00", "none",false, false, true, false, true,false)
+	);
+	drawable_obj_list.push(
+		new drawable_obj("rect", 400, 435,50,10, "#004c00", "none",false, false, true, false, true,false)
+	);
+	//window
+	drawable_obj_list.push(
+		new drawable_obj("rect", 260, 435,60,10, "#444c00", "none",false, false, true, true, true,false)
+	);
+	drawable_obj_list.push(
+		new drawable_obj("rect", 450, 435,60,10, "#444c00", "none",false, false, true, true, true,false)
+	);
+	//buildings again
+	drawable_obj_list.push(
+		new drawable_obj("rect", 240, 425,300,160, "#444caa", "none",false, false, true, false, true,true)
+	);
+	drawable_obj_list.push(
+		new drawable_obj("rect", 570, 425,210,160, "#444caa", "none",false, false, true, false, true,true)
+	);
+	drawable_obj_list.push(
+		new drawable_obj("rect", 0, 0,240,120, "#444caa", "none",false, false, true, false, true,true)
+	);
+	drawable_obj_list.push(
+		new drawable_obj("rect", 270, 0,240,120, "#444caa", "none",false, false, true, false, true,true)
+	);
+	drawable_obj_list.push(
+		new drawable_obj("rect", 540, 0,240,120, "#444caa", "none",false, false, true, false, true,true)
+	);
+	//enemies
+	enemy_list=new Array();
+	for(i=0;i<1;i++){
+		enemy_list.push(
+			new enemy("normaler Soldat",100,4,100,"none", true,14,0,490,470,999,999,"none",1000,250,[4,5,6,7,8,9,10,11])
+		);
+	}
+	enemy_list_wave.push(enemy_list);
+	//this has to be on the end of every lvl creating function
+	prepare_pathfinding();
+	ctx_bg.fillStyle="#44aa44"
+	ctx_bg.fillRect(0,0,780,585);
+	draw_bg_fg();
+}
+function draw_bg_fg(){
+	for (i=drawable_obj_list.length-1;i>-1;i--){
+		element=drawable_obj_list[i];
+		if(element.isstatic){
+			if(element.isforground && !creating){
+				ctx_fg.beginPath();
+				switch(element.drawtype){
+					case "arc":
+						ctx_fg.arc(element.xpos,element.ypos,element.width,0,2*Math.PI);
+					break;
+					case "rect":
+						ctx_fg.rect(element.xpos,element.ypos,element.width,element.height);
+					break;
+					case "line":
+						console.log("line not def. in draw()");
+					break;
+				}
+				ctx_fg.fillStyle = element.color;
+				ctx_fg.fill();
+				ctx_fg.closePath();
+			}else{
+				ctx_bg.beginPath();
+				switch(element.drawtype){
+					case "arc":
+						ctx_bg.arc(element.xpos,element.ypos,element.width,0,2*Math.PI);
+					break;
+					case "rect":
+						ctx_bg.rect(element.xpos,element.ypos,element.width,element.height);
+					break;
+					case "line":
+						console.log("line not def. in draw()");
+					break;
+				}
+				ctx_bg.fillStyle = element.color;
+				ctx_bg.fill();
+				ctx_bg.closePath();
+			}
+		}
+	}
+}
+function keydown(event){
+	if(event.keyCode==39){
+		draw(30);
+	}
+	switch(event.keyCode){
+		case 87://oben
+			player.move_direction[1]=-1;
+			player.moving=true;
+		break;
+		case 65://links
+			player.move_direction[0]=-1;
+			player.moving=true;
+		break;
+		case 83://unten
+			player.move_direction[1]=1;
+			player.moving=true;
+		break;
+		case 68://rechts
+			player.move_direction[0]=1;
+			player.moving=true;
+		break;
+	}
+}
+function keyup(event){
+	switch(event.keyCode){
+		case 87:
+			if (player.move_direction[1]==-1){
+				player.move_direction[1]=0;
+			}
+		break;
+		case 65:
+			if (player.move_direction[0]==-1){
+				player.move_direction[0]=0;
+			}
+		break;
+		case 83:
+			if (player.move_direction[1]==1){
+				player.move_direction[1]=0;
+			}
+		break;
+		case 68:
+			if (player.move_direction[0]==1){
+				player.move_direction[0]=0;
+			}
+		break;
+	}
+	if (player.move_direction[0]!=0 || player.move_direction[1]!=0){
+		player.moving=true;
+	}else{
+		player.moving=false;
+	}
+}
+var mouse_t=0,mouse_x=0,mouse_y=0,shTimer=-1;
+function mousemove(event){
+	mouse_x=event.pageX;
+	mouse_y=event.pageY;
+}
+function mousedown(){
+	mouse_x=event.pageX;
+	mouse_y=event.pageY;
+	is_mouse_down=true;
+	if (shTimer==-1){
+		shTimer=setInterval(shoot_player, 100);
+		shoot_player();
+	}
+}
+function mouseup(){
+	is_mouse_down=false;
+	if (shTimer!=-1){
+		clearInterval(shTimer);
+		shTimer=-1;
+	}
+}
+function shoot_player(){
+	var t=performance.now();
+	var tdiff=t-mouse_t;
+	mouse_t=t;
+	if(is_mouse_down){
+		var xpos=player.drawable_obj().xpos;
+		var ypos=player.drawable_obj().ypos;
+		var rect=document.getElementById("gamecanvas_bg").getBoundingClientRect();
+		var x=(mouse_x-rect.left-xpos)
+		if(x==0){
+			x=0.001
+		}
+		m=((mouse_y-rect.top-ypos)/x);
+		document.getElementById("time").innerHTML=(m);
+		var xdir=1;
+		if(x<0){
+			xdir=-1;
+		}
+		player.bullet_setup(tdiff,xpos,ypos,m,xdir);
+	}
+}
+function draw(time){
+	t2=performance.now();
+	var tdiff=t2-t;
+	t=t2;
+	if (!player.isdead){
+		//player
+		var temp_ms=player.speed/1000*tdiff;
+		var ms =[player.move_direction[0],player.move_direction[1]];//y/x
+		if(ms[0]!=0 && ms[1]!=0){
+			temp_ms=Math.pow(Math.pow(temp_ms,2)/2,0.5);
+		}
+		ms[0]=ms[0]*temp_ms;
+		ms[1]=ms[1]*temp_ms;
+		var char_xpos=player.drawable_obj().xpos;
+		var char_ypos=player.drawable_obj().ypos;
+		var char_w=player.size;
+		var borders=new Array();//weiter hinzufügen
+		var i=0;
+		for(i=0;i<static_borders.length;i++){
+			borders[i]=static_borders[i];
+		}
+		for(j=0;j<borders.length;j++){
+			if(borders[j][2]+char_w<=char_xpos && borders[j][2]+char_w>char_xpos+ms[0] && borders[j][1]-char_w<=char_ypos+ms[1] && borders[j][3]+char_w>=char_ypos+ms[1]){
+				//links laufen
+				ms[0]=borders[j][2]+char_w-char_xpos+0.0000001;
+			}
+			if(borders[j][0]-char_w>=char_xpos && borders[j][0]-char_w<char_xpos+ms[0] && borders[j][1]-char_w<=char_ypos+ms[1] && borders[j][3]+char_w>=char_ypos+ms[1]){
+				//rechts laufen
+				ms[0]=borders[j][0]-char_w-char_xpos-0.0000001;
+			}
+			if(borders[j][3]+char_w<=char_ypos && borders[j][3]+char_w>char_ypos+ms[1] && borders[j][2]+char_w>=char_xpos+ms[0] && borders[j][0]-char_w<=char_xpos+ms[0]){
+				//hoch laufen
+				ms[1]=borders[j][3]+char_w-char_ypos+0.0000001;
+			}
+			if(borders[j][1]-char_w>=char_ypos && borders[j][1]-char_w<char_ypos+ms[1] && borders[j][2]+char_w>=char_xpos+ms[0] && borders[j][0]-char_w<=char_xpos+ms[0]){
+				//runter laufen
+				ms[1]=borders[j][1]-char_w-char_ypos-0.0000001;
+			}
+			//console.log((borders[j][0]+char_w)+"//"+(borders[j][3]-char_w)+"//"+(borders[j][2]-char_w)+"//"+(borders[j][1]+char_w)+"//"+char_w+"//"+char_xpos+"//"+char_ypos);
+		}
+		if(player.moving){
+			if (player.move_direction[1]==1){
+				if (585-char_w>ms[1]+char_ypos){//hoch
+					player.drawable_obj().ypos+=ms[1];
+				}else{
+					player.drawable_obj().ypos=585-char_w;
+				}
+			}
+			if (player.move_direction[0]==1){
+				if (780-char_w>ms[0]+char_xpos){//nach rechts
+					player.drawable_obj().xpos+=ms[0];
+				}else{
+					player.drawable_obj().xpos=780-char_w;
+				}
+			}
+			if (player.move_direction[1]==-1){
+				if (0+char_w<ms[1]+char_ypos){//runter
+					player.drawable_obj().ypos+=ms[1];
+				}else{
+					player.drawable_obj().ypos=0+char_w;
+				}
+			}
+			if (player.move_direction[0]==-1){
+				if (0+char_w<ms[0]+char_xpos){//nach links
+					player.drawable_obj().xpos+=ms[0];
+				}else{
+					player.drawable_obj().xpos=0+char_w;
+				}
+			}
+		}
+		var k=0;var offset=0;
+		for(k=0;k-offset<bullet_list.length;k++){
+			bullet_list[k-offset].drawable_obj_list_pos-=offset;
+			if (bullet_list[k-offset].handler(tdiff)){
+				bullet_list.splice(k-offset,1);
+				offset++;
+			}
+		}
+		if (player.isinvincible){
+			player.isinvincible_time-=tdiff;
+			if (player.isinvincible_time<0){
+				player.isinvincible_time=0;
+				player.isinvincible=false;
+			}
+		}
+		if (!player.isinvincible){
+			var k=0;
+			var plx=player.drawable_obj().xpos;
+			var ply=player.drawable_obj().ypos;
+			var hp =player.hp;
+			for(k=0;k<bullet_list.length;k++){
+				if (!bullet_list[k].isplayer_owner){
+					player.hp=bullet_list[k].hit_test(plx,ply,player.size,hp);
+					if (player.hp!=hp){
+						k=bullet_list.length;
+						player.isinvincible=true;
+						player.isinvincible_time+=1000;
+					}
+				}
+			}
+			if (player.hp<=0){
+				player.isdead=true;
+			}
+		}
+		//visibile corners for player
+		var player_corners=new Array();
+		var i=0;
+		static_corners.forEach(function (corner){
+			var is_vision=true;
+			var is_blocked=false;
+			var target_x=corner[0]+corner[2]*char_w;
+			var target_y=corner[1]+corner[2]*char_w;
+			var plx=player.drawable_obj().xpos;
+			var ply=player.drawable_obj().ypos;
+			var dist=[target_x-plx,target_y-ply];//dist in x and y
+			var temp_vision=true;
+			for(k=0;k<borders.length;k++){
+				if(dist[0]!=0){
+					if (dist[0]>0){
+						var r=(borders[k][0]-char_w-plx)/dist[0];
+						var y=r*dist[1]+ply;
+						if ((y>borders[k][1]-char_w) && (y<borders[k][3]+char_w) && r<1 && r>0){
+							temp_vision=false;
+						}
+					}else{
+						var r=(borders[k][2]+char_w-plx)/dist[0];
+						var y=r*dist[1]+ply;
+						if ((y>borders[k][1]-char_w) && (y<borders[k][3]+char_w) && r<1 && r>0){
+							temp_vision=false;
+						}
+					}
+				}
+				if(dist[1]!=0){
+					if(dist[1]>0){
+						var r=(borders[k][1]-char_w-ply)/dist[1];
+						var x=r*dist[0]+plx;
+						if ((x>borders[k][0]-char_w) && (x<borders[k][2]+char_w) && r<1 && r>0){
+							temp_vision=false;
+						}
+					}else{
+						var r=(borders[k][3]+char_w-ply)/dist[1];
+						var x=r*dist[0]+plx;
+						if ((x>borders[k][0]-char_w) && (x<borders[k][2]+char_w) && r<1 && r>0){
+							temp_vision=false;
+						}
+					}
+				}
+			}
+			if(temp_vision){
+				var dist_hypo=Math.pow(Math.pow(Math.abs(dist[0]),2)+Math.pow(Math.abs(dist[1]),2),0.5);
+				player_corners.push([dist_hypo,i]);
+			}
+			i++;
+		});
+		//enemy
+		enemy_list_wave[0].forEach(function(element){
+			element.spawntime-=tdiff;
+			if (element.spawntime<=0){
+				element.drawable_obj().drawtype=element.drawtype;
+				if (!element.isdead && !element.isinvincible){
+					var k=0;
+					var plx=element.drawable_obj().xpos;
+					var ply=element.drawable_obj().ypos;
+					for(k=0;k<bullet_list.length;k++){
+						if (bullet_list[k].isplayer_owner){
+							element.hp=bullet_list[k].hit_test(plx,ply,element.size,element.hp);
+						}
+					}
+					if (element.hp<=0){
+						element.isdead=true;
+						element.drawable_obj().xpos=-100;
+						element.drawable_obj().ypos=-100;
+					}
+				}
+				if(!element.isdead){
+					var char_ypos=element.drawable_obj().ypos;
+					var char_xpos=element.drawable_obj().xpos;
+					var char_w=element.size;
+					md=element.speed/1000*tdiff;//moving distance
+					var m_x_y_s=[0,0];//moving x and y speed
+					var min_xdiff=element.min_xdiff;
+					var min_ydiff=element.min_ydiff;
+					while (md!=0){
+						var is_vision=true;
+						var is_blocked=false;
+						var plx=player.drawable_obj().xpos;
+						var ply=player.drawable_obj().ypos;
+						var dist=[plx-char_xpos,ply-char_ypos];//dist in x and y
+						var next_border=[0,0,999999];//element,border,distance
+						for(k=0;k<borders.length;k++){
+							var temp_vision=true;
+							if(dist[0]!=0){
+								if (dist[0]>0){
+									var r=(borders[k][0]-char_w-char_xpos)/dist[0];
+									var y=r*dist[1]+char_ypos;
+									if ((y>borders[k][1]-char_w) && (y<borders[k][3]+char_w) && r<1 && r>0){
+										temp_vision=false;
+										if (next_border[2]>Math.abs(borders[k][0]-char_w-char_xpos)){
+											next_border[2]=Math.abs(borders[k][0]-char_w-char_xpos);
+											next_border[1]=0;
+											next_border[0]=k;
+										}
+									}
+								}else{
+									var r=(borders[k][2]+char_w-char_xpos)/dist[0];
+									var y=r*dist[1]+char_ypos;
+									if ((y>borders[k][1]-char_w) && (y<borders[k][3]+char_w) && r<1 && r>0){
+										temp_vision=false;
+										if (next_border[2]>Math.abs(borders[k][2]+char_w-char_xpos)){
+											next_border[2]=Math.abs(borders[k][2]+char_w-char_xpos);
+											next_border[1]=2;
+											next_border[0]=k;
+										}
+									}
+								}
+							}
+							if(dist[1]!=0){
+								if(dist[1]>0){
+									var r=(borders[k][1]-char_w-char_ypos)/dist[1];
+									var x=r*dist[0]+char_xpos;
+									if ((x>borders[k][0]-char_w) && (x<borders[k][2]+char_w) && r<1 && r>0){
+										temp_vision=false;
+										if (next_border[2]>Math.abs(borders[k][1]-char_w-char_ypos)){
+											next_border[2]=Math.abs(borders[k][1]-char_w-char_ypos);
+											next_border[1]=1;
+											next_border[0]=k;
+										}
+									}
+								}else{
+									var r=(borders[k][3]+char_w-char_ypos)/dist[1];
+									var x=r*dist[0]+char_xpos;
+									if ((x>borders[k][0]-char_w) && (x<borders[k][2]+char_w) && r<1 && r>0){
+										temp_vision=false;
+										if (next_border[2]>Math.abs(borders[k][3]+char_w-char_ypos)){
+											next_border[2]=Math.abs(borders[k][3]+char_w-char_ypos);
+											next_border[1]=3;
+											next_border[0]=k;
+										}
+									}
+								}
+							}
+							if (!borders[k][4] && !temp_vision){
+								is_vision=false;
+							}
+							if(!temp_vision){
+								is_blocked=true;
+							}
+						}
+						var k=0;
+						if(is_vision){
+							//shoot and walk to player
+							var x=dist[0];
+							if (x==0){x=0.000001;}
+							var m=dist[1]/x;
+							var xdir=1;
+							if (plx<char_xpos){xdir=-1*xdir;}
+							element.bullet_setup(tdiff,char_xpos,char_ypos,m,xdir);
+							if (dist[0]<element.min_xdiff && dist[1]<element.min_ydiff){
+								md=0;
+							}
+						}
+						if(!is_blocked){
+							var dist_hypo=Math.pow(Math.pow(Math.abs(dist[0]),2)+Math.pow(Math.abs(dist[1]),2),0.5);
+							if(dist_hypo!=0){
+								m_x_y_s=[dist[0]/dist_hypo,dist[1]/dist_hypo];
+								if (dist_hypo<=md){
+									char_xpos+=(dist_hypo)*m_x_y_s[0];
+									char_ypos+=(dist_hypo)*m_x_y_s[1];
+								}else{
+									char_xpos+=(md)*m_x_y_s[0];
+									char_ypos+=(md)*m_x_y_s[1];
+								}
+							}
+							element.move_path=[-1];
+							element.path_index=0;
+							element.player_corner=-1;
+							md=0;
+						}else{
+							//find reachable knots from player and enemy
+							var temp_vision=false;
+							var en_corner_list=new Array();
+							var en_corner_list_i=-1;
+							while (!temp_vision){
+								var corner=next_border[0]*4+next_border[1];
+								var corner2=next_border[0]*4+((next_border[1]+3)%4);
+								en_corner_list.forEach(function(corner_el){
+									if(corner_el==corner){
+										corner=-1;
+									}
+									if(corner_el==corner2){
+										corner2=-1;
+									}
+								});
+								if (corner!=-1){
+									en_corner_list.push([corner,next_border[2]]);
+								}
+								if (corner2!=-1){
+									en_corner_list.push([corner2,next_border[2]]);
+								}
+								temp_vision=true;
+								en_corner_list_i++;
+								var plx=static_corners[en_corner_list[en_corner_list_i][0]][0]+static_corners[en_corner_list[en_corner_list_i][0]][2]*char_w;
+								var ply=static_corners[en_corner_list[en_corner_list_i][0]][1]+static_corners[en_corner_list[en_corner_list_i][0]][3]*char_w;
+								var dist=[plx-char_xpos,ply-char_ypos];//dist in x and y
+								for(k=0;k<borders.length;k++){
+									if(dist[0]!=0){
+										if (dist[0]>0){
+											var r=(borders[k][0]-char_w-char_xpos)/dist[0];
+											var y=r*dist[1]+char_ypos;
+											if ((y>borders[k][1]-char_w) && (y<borders[k][3]+char_w) && r<1 && r>0){
+												temp_vision=false;
+												next_border[1]=0;
+												next_border[0]=k;
+												k=borders.length;dist[1]=0;
+											}
+										}else{
+											var r=(borders[k][2]+char_w-char_xpos)/dist[0];
+											var y=r*dist[1]+char_ypos;
+											if ((y>borders[k][1]-char_w) && (y<borders[k][3]+char_w) && r<1 && r>0){
+												temp_vision=false;
+												next_border[1]=2;
+												next_border[0]=k;
+												k=borders.length;dist[1]=0;
+											}
+										}
+									}
+									if(dist[1]!=0){
+										if(dist[1]>0){
+											var r=(borders[k][1]-char_w-char_ypos)/dist[1];
+											var x=r*dist[0]+char_xpos;
+											if ((x>borders[k][0]-char_w) && (x<borders[k][2]+char_w) && r<1 && r>0){
+												temp_vision=false;
+												next_border[1]=1;
+												next_border[0]=k;
+												k=borders.length;
+											}
+										}else{
+											var r=(borders[k][3]+char_w-char_ypos)/dist[1];
+											var x=r*dist[0]+char_xpos;
+											if ((x>borders[k][0]-char_w) && (x<borders[k][2]+char_w) && r<1 && r>0){
+												temp_vision=false;
+												next_border[1]=3;
+												next_border[0]=k;
+												k=borders.length;
+											}
+										}
+									}
+								}
+							}
+							corner_en=en_corner_list[en_corner_list_i][0];
+							//console.log(corner_en+"//"+player_corners);
+							var player_corner_index=-1;
+							var player_corner_dist=999999;
+							player_corners.forEach(function(corner){
+								if(static_corner_connections[corner_en][corner[1]][0]+corner[0]<player_corner_dist){
+									player_corner_index=corner[1];
+									player_corner_dist=static_corner_connections[corner_en][corner[1]][0]+corner[0];
+								}
+							});
+							if(player_corner_index!=element.player_corner){
+								if (player_corner_index==-1){
+									md=0;
+								}else{
+									element.player_corner=player_corner_index;
+									element.path_index=0;
+									element.move_path=static_corner_connections[corner_en][player_corner_index][1].slice();
+									//console.log(element.move_path+" charx "+char_xpos+" chary "+char_ypos+" corner_en "+corner_en+" player_corner_index "+player_corner_index);
+									//console.log(element.move_path);
+									//clearInterval(myTimer);
+								}
+							}
+							while (md!=0){
+								if (element.path_index<element.move_path.length){
+									var corner_pos=static_corners[element.move_path[element.path_index]].slice();
+								}else{
+									corner_pos[0]=player.drawable_obj().xpos;
+									corner_pos[1]=player.drawable_obj().ypos;
+									corner_pos[2]=0;
+									corner_pos[3]=0;
+								}
+								dist[0]=corner_pos[0]+corner_pos[2]*(char_w+0.000001)-char_xpos;
+								dist[1]=corner_pos[1]+corner_pos[3]*(char_w+0.000001)-char_ypos;
+								var dist_hypo=Math.pow(Math.pow(Math.abs(dist[0]),2)+Math.pow(Math.abs(dist[1]),2),0.5);
+								if(dist_hypo!=0){
+									m_x_y_s=[dist[0]/dist_hypo,dist[1]/dist_hypo];
+									if (dist_hypo<=md){
+										char_xpos+=(dist_hypo)*m_x_y_s[0];
+										char_ypos+=(dist_hypo)*m_x_y_s[1];
+										md-=dist_hypo;
+										element.path_index++;
+									}else{
+										char_xpos+=(md)*m_x_y_s[0];
+										char_ypos+=(md)*m_x_y_s[1];
+										md=0;
+									}
+								}
+							}
+						}
+					}
+					element.drawable_obj().ypos=char_ypos;
+					element.drawable_obj().xpos=char_xpos;
+					//console.log(char_xpos+"//"+char_ypos+"//"+borders[borders.length-1]);
+				}
+			}
+		});
+	}else{
+		//console.log("player dead");
+	}
+	//drawing
+	ctx.clearRect(0, 0, 780, 585);
+	if(drawable_obj_list.length>0){
+		drawable_obj_list.forEach(function(element){
+			if(!element.isstatic){
+				ctx.beginPath();
+				switch(element.drawtype){
+					case "arc":
+						ctx.arc(element.xpos,element.ypos,element.width,0,2*Math.PI);
+					break;
+					case "rect":
+						ctx.rect(element.xpos,element.ypos,element.width,element.height);
+					break;
+					case "line":
+						console.log("line not def. in draw()");
+					break;
+				}
+				ctx.fillStyle = element.color;
+				ctx.fill();
+				ctx.closePath();
+			}
+		//for borders
+		});
+	}
+	//gui
+	drawable_obj_list_gui[1].width=player.hp;
+	if(drawable_obj_list_gui.length>0){
+		drawable_obj_list_gui.forEach(function(element){
+			if(!element.isstatic){
+				ctx_gui.beginPath();
+				switch(element.drawtype){
+					case "arc":
+						ctx_gui.arc(element.xpos,element.ypos,element.width,0,2*Math.PI);
+					break;
+					case "rect":
+						ctx_gui.rect(element.xpos,element.ypos,element.width,element.height);
+					break;
+					case "line":
+						console.log("line not def. in draw()");
+					break;
+				}
+				ctx_gui.fillStyle = element.color;
+				ctx_gui.fill();
+				ctx_gui.closePath();
+			}
+		//for borders
+		});
+	}
+	t40-=tdiff;
+	am++;
+	tos+=performance.now()-t;
+	if (t40<=0){
+	t40+=10000;
+	console.log(tos/am);
+	tos=0;
+	am=0;
+	}
+}
+var t40=0;
+var tos=0;
+var am =0;
+</script>
+<style>
+HTML{
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+	cursor:default;
+}
+.cam{
+	position: absolute;
+	left: 50%;
+	top:70px;
+	margin-left: -390px;
+	width: 780px;
+	height: 585px;
+}
+#time{
+	position:fixed;
+	left:0px;
+	bottom:0px;
+	width:50px;
+	height:50px;
+	background:red;
+}
+</style>
+</head>
+<body onload="init();">
+	<div class="cam">
+		<canvas style="" id="gamecanvas_bg" width="780" height="585"></canvas>
+	</div>
+	<div class="cam">
+		<canvas style="" id="gamecanvas" width="780" height="585"></canvas>
+	</div>
+	<div class="cam">
+		<canvas style="" id="gamecanvas_fg" width="780" height="585"></canvas>
+	</div>
+	<div class="cam">
+		<canvas style="" id="gamecanvas_gui" width="780" height="585"></canvas>
+	</div>
+	<div id="time">
+		
+	</div>
+</body>
+</html>

@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=windows-1252">
+<title>fps</title>
+<script>
+var ctx;
+var size_of_block_d=10;
+var size_of_block=Math.pow(Math.pow(size_of_block_d,2)*2,0.5);
+//sizes for the outcome images
+var r_size_of_block_d=4;
+var r_size_of_block=4;//Math.pow(Math.pow(r_size_of_block_d,2)*2,0.5);
+var amount_of_blocks_x_y_z=[24,24,24];//[7,14,7]
+var blocks;
+var dir_x_y=[0,1];
+var choosen_block=[0,0,0, true];
+var max_ypos=0;
+var is_one_layer_mode=false;
+function init(){
+	var x=parseInt("hi");
+	while(isNaN(parseInt(x))){
+		x = prompt('Geben Sie die Vektorgröße in x/z Richtung an', '');
+	}
+	amount_of_blocks_x_y_z[0]=parseInt(x);
+	amount_of_blocks_x_y_z[2]=parseInt(x);
+	var x=parseInt("hi");
+	while(isNaN(parseInt(x))){
+		x = prompt('Geben Sie die Vektorgröße in y Richtung an', '');
+	}
+	amount_of_blocks_x_y_z[1]=parseInt(x);
+	ctx=document.getElementById("pseudo_3d_graphic").getContext("2d");
+	blocks=new Array(amount_of_blocks_x_y_z[0]);
+	for(i=0;i<amount_of_blocks_x_y_z[0];i++){
+		blocks[i]=new Array(amount_of_blocks_x_y_z[1]);
+		for(k=0;k<amount_of_blocks_x_y_z[1];k++){
+			blocks[i][k]=new Array(amount_of_blocks_x_y_z[2]);
+			for(j=0;j<amount_of_blocks_x_y_z[2];j++){
+				blocks[i][k][j]=[0,0,255,0];
+			}
+		}
+	}
+	//draw();
+	if (window.addEventListener){
+		document.addEventListener("mousemove", mousemove);
+		document.addEventListener("keydown", keydown, false);
+	}else if (window.attachEvent){
+		window.attachEvent("onmousemove", mousemove);
+		window.attachEvent("onkeydown", keydown);
+	}
+	setInterval(draw,100);
+}
+function mousemove(){
+	//console.log(event.pageX+","+event.pageY);
+}
+function draw(){
+	var x=0,y=0,z=0;
+	if (!is_one_layer_mode){
+		var offset_y=(size_of_block*(amount_of_blocks_x_y_z[1]-1))+(size_of_block_d*(amount_of_blocks_x_y_z[2]));
+		var offset_x=0;
+	}else{
+		var offset_y=(max_ypos-1)*size_of_block+585;
+		var offset_x=0;
+	}
+	var depth=size_of_block_d;//Math.pow(Math.pow(size_of_block,2)/2,0.5);
+	ctx.clearRect(0, 0, 780, 585);
+	blocks.forEach(function (elementx){
+		elementx.forEach(function (elementy){
+			if((y<=max_ypos && !is_one_layer_mode) || (is_one_layer_mode && y==max_ypos)){
+				var i=0;
+				z=elementy.length-1;
+				for(i=elementy.length-1;i>-1;i--){
+					var elementz=elementy[i];
+					var rdepth_x=depth*(z+1)*dir_x_y[0];
+					var predepth_x=depth*(z)*dir_x_y[0];
+					var predepth_y=depth*(z)*dir_x_y[1];
+					var rdepth_y=depth*(z+1)*dir_x_y[1];
+					ctx.beginPath();
+					ctx.moveTo(x*size_of_block_d+predepth_x+offset_x, (-y)*size_of_block-predepth_y+offset_y);
+					ctx.lineTo(x*size_of_block_d+rdepth_x+offset_x, (-y)*size_of_block-rdepth_y+offset_y);
+					ctx.lineTo((x+1)*size_of_block_d+rdepth_x+offset_x, (-y)*size_of_block-rdepth_y+offset_y);
+					ctx.lineTo((x+1)*size_of_block_d+predepth_x+offset_x, (-y)*size_of_block-predepth_y+offset_y);
+					ctx.lineTo(x*size_of_block_d+predepth_x+offset_x, (-y)*size_of_block-predepth_y+offset_y);
+					ctx.closePath();
+					if (choosen_block[0]==x && choosen_block[1]==y && choosen_block[2]==z){
+						if (choosen_block[3]){
+							var rgba="rgba(100,100,100,1)";
+							ctx.fillStyle = "rgba(100,100,100,1)";
+						}else{
+							var rgba="rgba("+(parseInt(elementz[0]+50))+","+(parseInt(elementz[1]+50))+","+(parseInt(elementz[2]+50))+","+elementz[3]+")";
+							ctx.fillStyle = rgba;
+						}
+					}else{
+						var rgba="rgba("+(parseInt(elementz[0]+50))+","+(parseInt(elementz[1]+50))+","+(parseInt(elementz[2]+50))+","+elementz[3]+")";
+						ctx.fillStyle = rgba;
+					}
+					ctx.fill();
+					ctx.lineWidth = 1;
+					ctx.strokeStyle = 'black';
+					ctx.stroke();
+					ctx.beginPath();
+					ctx.moveTo((x+1)*size_of_block_d+predepth_x+offset_x, (-y)*size_of_block-predepth_y+offset_y);
+					ctx.lineTo((x+1)*size_of_block_d+predepth_x+offset_x, ((-y)+1)*size_of_block-predepth_y+offset_y);
+					ctx.lineTo((x+1)*size_of_block_d+rdepth_x+offset_x, ((-y)+1)*size_of_block-rdepth_y+offset_y);
+					ctx.lineTo((x+1)*size_of_block_d+rdepth_x+offset_x, (-y)*size_of_block-rdepth_y+offset_y);
+					ctx.lineTo((x+1)*size_of_block_d+predepth_x+offset_x, (-y)*size_of_block-predepth_y+offset_y);
+					ctx.closePath();
+					if (choosen_block[0]==x && choosen_block[1]==y && choosen_block[2]==z){
+						if (choosen_block[3]){
+							var rgba="rgba(100,100,100,1)";
+							ctx.fillStyle = "rgba(100,100,100,1)";
+						}else{
+							var rgba="rgba("+(parseInt(elementz[0]+25))+","+(parseInt(elementz[1]+25))+","+(parseInt(elementz[2]+25))+","+elementz[3]+")";
+							ctx.fillStyle = rgba;
+						}
+					}else{
+						var rgba="rgba("+(parseInt(elementz[0]+25))+","+(parseInt(elementz[1]+25))+","+(parseInt(elementz[2]+25))+","+elementz[3]+")";
+						ctx.fillStyle = rgba;
+					}
+					ctx.fill();
+					ctx.lineWidth = 1;
+					ctx.strokeStyle = 'black';
+					ctx.stroke();
+					//front
+					ctx.beginPath();
+					ctx.rect(x*size_of_block_d+predepth_x+offset_x,-y*size_of_block+offset_y-predepth_y,size_of_block_d,size_of_block);
+					ctx.closePath();
+					if (choosen_block[0]==x && choosen_block[1]==y && choosen_block[2]==z){
+						if (choosen_block[3]){
+							ctx.fillStyle = "rgba(100,100,100,1)";
+						}else{
+							var rgba="rgba("+(parseInt(elementz[0]))+","+(parseInt(elementz[1]))+","+(parseInt(elementz[2]))+","+elementz[3]+")";
+							ctx.fillStyle = rgba;
+						}
+						choosen_block[3]=!choosen_block[3];
+					}else{
+						var rgba="rgba("+(parseInt(elementz[0]))+","+(parseInt(elementz[1]))+","+(parseInt(elementz[2]))+","+elementz[3]+")";
+						ctx.fillStyle = rgba;
+					}
+					ctx.fill();
+					ctx.lineWidth = 1;
+					ctx.strokeStyle = 'black';
+					ctx.stroke();
+					z--;
+				}
+			}
+			y++;
+		});
+		y=0;
+		x++;
+	});
+}
+function keydown(event){
+	document.getElementById("color_red").blur();
+	document.getElementById("color_green").blur();
+	document.getElementById("color_blue").blur();
+	switch(event.keyCode){
+		case 83://s
+			blocks[choosen_block[0]][choosen_block[1]][choosen_block[2]][0]=act_color[0];
+			blocks[choosen_block[0]][choosen_block[1]][choosen_block[2]][1]=act_color[1];
+			blocks[choosen_block[0]][choosen_block[1]][choosen_block[2]][2]=act_color[2];
+			blocks[choosen_block[0]][choosen_block[1]][choosen_block[2]][3]=1;
+		break;
+		case 68://d
+			blocks[choosen_block[0]][choosen_block[1]][choosen_block[2]][3]=0;
+		break;
+		case 38://up
+			choosen_block[2]+=1;
+			document.getElementById("ch_x").value=choosen_block[0];
+			document.getElementById("ch_y").value=choosen_block[1];
+			document.getElementById("ch_z").value=choosen_block[2];
+		break;
+		case 37://left
+			choosen_block[0]-=1;
+			document.getElementById("ch_x").value=choosen_block[0];
+			document.getElementById("ch_y").value=choosen_block[1];
+			document.getElementById("ch_z").value=choosen_block[2];
+		break;
+		case 39://right
+			choosen_block[0]+=1;
+			document.getElementById("ch_x").value=choosen_block[0];
+			document.getElementById("ch_y").value=choosen_block[1];
+			document.getElementById("ch_z").value=choosen_block[2];
+		break;
+		case 40://down
+			choosen_block[2]-=1;
+			document.getElementById("ch_x").value=choosen_block[0];
+			document.getElementById("ch_y").value=choosen_block[1];
+			document.getElementById("ch_z").value=choosen_block[2];
+		break;
+		case 33://b down
+			max_ypos++;
+			choosen_block[1]+=1;
+			document.getElementById("ch_x").value=choosen_block[0];
+			document.getElementById("ch_y").value=choosen_block[1];
+			document.getElementById("ch_z").value=choosen_block[2];
+		break;
+		case 34://b up 
+			max_ypos--;
+			choosen_block[1]-=1;
+			document.getElementById("ch_x").value=choosen_block[0];
+			document.getElementById("ch_y").value=choosen_block[1];
+			document.getElementById("ch_z").value=choosen_block[2];
+		break;
+	}
+}
+var act_color=[50,50,50];
+function setcolor(index){
+	if (index==-1){
+		act_color[0]=parseInt(document.getElementById("color_red").value);
+		act_color[1]=parseInt(document.getElementById("color_green").value);
+		act_color[2]=parseInt(document.getElementById("color_blue").value);
+	}else{
+		act_color[0]=saved_color[index][0];
+		act_color[1]=saved_color[index][1];
+		act_color[2]=saved_color[index][2];
+		document.getElementById("color_red").value=act_color[0];
+		document.getElementById("color_green").value=act_color[1];
+		document.getElementById("color_blue").value=act_color[2];
+	}
+	document.getElementById("color_red_nr").value=act_color[0];
+	document.getElementById("color_green_nr").value=act_color[1];
+	document.getElementById("color_blue_nr").value=act_color[2];
+	blocks[choosen_block[0]][choosen_block[1]][choosen_block[2]][0]=act_color[0];
+	blocks[choosen_block[0]][choosen_block[1]][choosen_block[2]][1]=act_color[1];
+	blocks[choosen_block[0]][choosen_block[1]][choosen_block[2]][2]=act_color[2];
+	blocks[choosen_block[0]][choosen_block[1]][choosen_block[2]][3]=1;
+	apply_color();
+	return true;
+}
+function apply_color(){
+	document.getElementById("real_preshow").style.background="rgb("+act_color[0]+","+act_color[1]+","+act_color[2]+")";
+	return true;
+}
+function change_choosen_block(){
+	var x=parseInt(document.getElementById("ch_x").value);
+	var y=parseInt(document.getElementById("ch_y").value);
+	var z=parseInt(document.getElementById("ch_z").value);
+	choosen_block=[x,y,z];
+}
+var saved_color=new Array();
+function save_color(){
+	saved_color.unshift([act_color[0],act_color[1],act_color[2]]);
+	var innerhtml="<span class='title_ch'>Color List:</span>";
+	var i=0;
+	if (saved_color.length>24){
+		saved_color.splice(-1);
+	}
+	saved_color.forEach(function (element){
+		innerhtml+='<div class="preshow_color" onclick="setcolor('+i+')" style="top:'+(i*20+20)+'px;background:rgb('+element[0]+","+element[1]+","+element[2]+')"></div>';
+		i++;
+	});
+	document.getElementById("saved_color_list").innerHTML=innerhtml;
+}
+function setcolor_nr(){
+	document.getElementById("color_red").value=act_color[0];
+	document.getElementById("color_green").value=act_color[1];
+	document.getElementById("color_blue").value=act_color[2];
+	setcolor(-1);
+}
+function ready_png(){
+	var x=parseInt("hi");
+	while(isNaN(parseInt(x))){
+		x = prompt('Geben Sie die Block größe an', '');
+	}
+	r_size_of_block=parseInt(x);
+	var blocks_copy=new Array(amount_of_blocks_x_y_z[0]);
+	for(i=0;i<amount_of_blocks_x_y_z[0];i++){
+		blocks_copy[i]=new Array(amount_of_blocks_x_y_z[1]);
+		for(k=0;k<amount_of_blocks_x_y_z[1];k++){
+			blocks_copy[i][k]=new Array(amount_of_blocks_x_y_z[2]);
+			for(j=0;j<amount_of_blocks_x_y_z[2];j++){
+				blocks_copy[i][k][j]=new Array(4);
+				blocks_copy[i][k][j][0]=blocks[i][k][j][0];
+				blocks_copy[i][k][j][1]=blocks[i][k][j][1];
+				blocks_copy[i][k][j][2]=blocks[i][k][j][2];
+				blocks_copy[i][k][j][3]=blocks[i][k][j][3];
+			}
+		}
+	}
+	if(dir_x_y[0]+dir_x_y[1]==2){
+		r_size_of_block_d=Math.pow(Math.pow(r_size_of_block,2)/2,0.5);
+	}else{
+		r_size_of_block_d=r_size_of_block;
+	}
+	var offset_y=(r_size_of_block*(amount_of_blocks_x_y_z[1]-1))+(r_size_of_block_d*(amount_of_blocks_x_y_z[2]));
+	console.log(r_size_of_block);
+	var offset_x=0;
+	var canvas = document.createElement('canvas');
+	canvas.width = (r_size_of_block*amount_of_blocks_x_y_z[0]+r_size_of_block_d*amount_of_blocks_x_y_z[0]*dir_x_y[0])*4;
+	canvas.height =offset_y+r_size_of_block;
+	var outcome_ctx=canvas.getContext("2d");
+	outcome_ctx.clearRect(0, 0, 780, 585);
+	draw_png(offset_x,offset_y,blocks_copy,outcome_ctx);
+	for(i=0;i<amount_of_blocks_x_y_z[0];i++){
+		for(k=0;k<amount_of_blocks_x_y_z[1];k++){
+			for(j=0;j<amount_of_blocks_x_y_z[2];j++){
+				blocks_copy[j][k][amount_of_blocks_x_y_z[2]-i-1][0]=blocks[i][k][j][0];
+				blocks_copy[j][k][amount_of_blocks_x_y_z[2]-i-1][1]=blocks[i][k][j][1];
+				blocks_copy[j][k][amount_of_blocks_x_y_z[2]-i-1][2]=blocks[i][k][j][2];
+				blocks_copy[j][k][amount_of_blocks_x_y_z[2]-i-1][3]=blocks[i][k][j][3];
+			}
+		}
+	}
+	var offset_x=r_size_of_block*amount_of_blocks_x_y_z[0]+r_size_of_block_d*amount_of_blocks_x_y_z[0]*dir_x_y[0];
+	draw_png(offset_x,offset_y,blocks_copy,outcome_ctx);
+	for(i=0;i<amount_of_blocks_x_y_z[0];i++){
+		for(k=0;k<amount_of_blocks_x_y_z[1];k++){
+			for(j=0;j<amount_of_blocks_x_y_z[2];j++){
+				blocks_copy[amount_of_blocks_x_y_z[0]-i-1][k][amount_of_blocks_x_y_z[2]-j-1][0]=blocks[i][k][j][0];
+				blocks_copy[amount_of_blocks_x_y_z[0]-i-1][k][amount_of_blocks_x_y_z[2]-j-1][1]=blocks[i][k][j][1];
+				blocks_copy[amount_of_blocks_x_y_z[0]-i-1][k][amount_of_blocks_x_y_z[2]-j-1][2]=blocks[i][k][j][2];
+				blocks_copy[amount_of_blocks_x_y_z[0]-i-1][k][amount_of_blocks_x_y_z[2]-j-1][3]=blocks[i][k][j][3];
+			}
+		}
+	}
+	var offset_x=(r_size_of_block*amount_of_blocks_x_y_z[0]+r_size_of_block_d*amount_of_blocks_x_y_z[0]*dir_x_y[0])*2;
+	draw_png(offset_x,offset_y,blocks_copy,outcome_ctx);
+	for(i=0;i<amount_of_blocks_x_y_z[0];i++){
+		for(k=0;k<amount_of_blocks_x_y_z[1];k++){
+			for(j=0;j<amount_of_blocks_x_y_z[2];j++){
+				blocks_copy[amount_of_blocks_x_y_z[0]-j-1][k][i][0]=blocks[i][k][j][0];
+				blocks_copy[amount_of_blocks_x_y_z[0]-j-1][k][i][1]=blocks[i][k][j][1];
+				blocks_copy[amount_of_blocks_x_y_z[0]-j-1][k][i][2]=blocks[i][k][j][2];
+				blocks_copy[amount_of_blocks_x_y_z[0]-j-1][k][i][3]=blocks[i][k][j][3];
+			}
+		}
+	}
+	var offset_x=(r_size_of_block*amount_of_blocks_x_y_z[0]+r_size_of_block_d*amount_of_blocks_x_y_z[0]*dir_x_y[0])*3;
+	draw_png(offset_x,offset_y,blocks_copy,outcome_ctx);
+    var dt = canvas.toDataURL('image/png');
+	document.getElementById("outcome_img").height=canvas.height;
+	document.getElementById("outcome_img").width=canvas.width;
+	document.getElementById("outcome_img").src=dt;
+}
+function draw_png(offset_x,offset_y,blocks_copy,outcome_ctx){
+	var x=0,y=0,z=0;
+	var depth=r_size_of_block_d;//Math.pow(Math.pow(r_size_of_block,2)/2,0.5);
+	blocks_copy.forEach(function (elementx){
+		elementx.forEach(function (elementy){
+			var i=0;
+			z=elementy.length-1;
+			for(i=elementy.length-1;i>-1;i--){
+				var elementz=elementy[i];
+				var rdepth_x=depth*(z+1)*dir_x_y[0];
+				var predepth_x=depth*(z)*dir_x_y[0];
+				var predepth_y=depth*(z)*dir_x_y[1];
+				var rdepth_y=depth*(z+1)*dir_x_y[1];
+				outcome_ctx.beginPath();
+				outcome_ctx.moveTo(x*r_size_of_block+predepth_x+offset_x, (-y)*r_size_of_block-predepth_y+offset_y);
+				outcome_ctx.lineTo(x*r_size_of_block+rdepth_x+offset_x, (-y)*r_size_of_block-rdepth_y+offset_y);
+				outcome_ctx.lineTo((x+1)*r_size_of_block+rdepth_x+offset_x, (-y)*r_size_of_block-rdepth_y+offset_y);
+				outcome_ctx.lineTo((x+1)*r_size_of_block+predepth_x+offset_x, (-y)*r_size_of_block-predepth_y+offset_y);
+				outcome_ctx.lineTo(x*r_size_of_block+predepth_x+offset_x, (-y)*r_size_of_block-predepth_y+offset_y);
+				outcome_ctx.closePath();
+				var rgba="rgba("+(parseInt(elementz[0]+50))+","+(parseInt(elementz[1]+50))+","+(parseInt(elementz[2]+50))+","+elementz[3]+")";
+				outcome_ctx.fillStyle = rgba;
+				outcome_ctx.fill();
+				outcome_ctx.beginPath();
+				outcome_ctx.moveTo((x+1)*r_size_of_block+predepth_x+offset_x, (-y)*r_size_of_block-predepth_y+offset_y);
+				outcome_ctx.lineTo((x+1)*r_size_of_block+predepth_x+offset_x, ((-y)+1)*r_size_of_block-predepth_y+offset_y);
+				outcome_ctx.lineTo((x+1)*r_size_of_block+rdepth_x+offset_x, ((-y)+1)*r_size_of_block-rdepth_y+offset_y);
+				outcome_ctx.lineTo((x+1)*r_size_of_block+rdepth_x+offset_x, (-y)*r_size_of_block-rdepth_y+offset_y);
+				outcome_ctx.lineTo((x+1)*r_size_of_block+predepth_x+offset_x, (-y)*r_size_of_block-predepth_y+offset_y);
+				outcome_ctx.closePath();
+				var rgba="rgba("+(parseInt(elementz[0]+25))+","+(parseInt(elementz[1]+25))+","+(parseInt(elementz[2]+25))+","+elementz[3]+")";
+				outcome_ctx.fillStyle = rgba;
+				outcome_ctx.fill();
+				//front
+				outcome_ctx.beginPath();
+				outcome_ctx.rect(x*r_size_of_block+predepth_x+offset_x,-y*r_size_of_block+offset_y-predepth_y,r_size_of_block,r_size_of_block);
+				outcome_ctx.closePath();
+				outcome_ctx.fillStyle = "rgba("+elementz[0]+","+elementz[1]+","+elementz[2]+","+elementz[3]+")";
+				outcome_ctx.fill();
+				z--;
+			}
+			y++;
+		});
+		y=0;
+		x++;
+	});
+}
+function change_dir(val){
+	if(val=="y"){
+		dir_x_y=[0,1];
+	}else{
+		dir_x_y=[1,1];
+	}
+}
+</script>
+<style>
+HTML{
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+	cursor:default;
+	background:#222222;
+}
+#main{
+	position: absolute;
+	left: 50%;
+	top:0px;
+	margin-left: -392px;
+	width: 780px;
+	height: 585px;
+	border: white solid 2px;
+}
+#outcome{
+	position: absolute;
+	left: 50%;
+	top:585px;
+	margin-left: -392px;
+	width: 780px;
+	height: 100px;
+	border: white solid 2px;
+	overflow:scroll;
+}
+#outcome:hover{
+	cursor:pointer;
+}
+#controls{
+	position:fixed;
+	left:0px;
+	top:0px;
+	height:100%;
+	background:#444444;
+	width:100px;
+}
+.preshow_color{
+	position:absolute;
+	background:rgb(50,50,50);
+	width:100%;
+	height:20px;
+	left:0px;
+	top:0px;
+	right:0px;
+}
+.preshow_color:hover{
+	cursor:pointer;
+}
+#control_color{
+	position:absolute;
+	width:100%;
+	height:130px;
+	top:20px;
+	left:0px;
+}
+.slider{
+	width:90%;
+	padding-left:5%;
+	height:20px;
+	padding-top:5px;
+	padding-bottom:0px;
+}
+#choosenblock{
+	position:absolute;
+	width:100%;
+	left:0px;
+	top:150px;
+	height:42px;
+}
+.ch_input{
+	width:27px;
+	padding-left:0px;
+	margin-left:1px;
+	padding-right:0px;
+}
+.title_ch{
+	font-size:12px;
+	font-weight:bold;
+	color:#eeeeee;
+}
+#saved_color_list{
+	background:green;
+	position:absolute;
+	width:100%;
+	height:500px;
+	top:192px;
+	left:0px;
+}
+#direction_toggle{
+	position:absolute;
+	left:0px;
+	top:692px;
+	height:30px;
+	width:100%;
+}
+</style>
+</head>
+<body onload="init();">
+	<div id="main">
+		<canvas style="" id="pseudo_3d_graphic" width="780" height="585"></canvas>
+	</div>
+	<div id="outcome" onclick="ready_png();">
+		<img href="#" id="outcome_img" width="780" height="100" style="background:black;"></img>
+	</div>
+	<div id="controls">
+		<div class="preshow_color" id="real_preshow" onclick="save_color();">save</div>
+		<div id="control_color">
+			<input type="range" min="0" max="255" value="50" class="slider" id="color_red" onchange="setcolor(-1);">
+			<input type="range" min="0" max="255" value="50" class="slider" id="color_green" onchange="setcolor(-1);">
+			<input type="range" min="0" max="255" value="50" class="slider" id="color_blue" onchange="setcolor(-1);">
+			<span class="title_ch">r-g-b:</span><br>
+			<input type="number" value="50" id="color_red_nr" class="ch_input" onchange="act_color[0]=this.value;setcolor_nr();">
+			<input type="number" value="50" id="color_green_nr" class="ch_input" onchange="act_color[1]=this.value;setcolor_nr();">
+			<input type="number" value="50" id="color_blue_nr" class="ch_input" onchange="act_color[2]=this.value;setcolor_nr();">
+		</div>
+		<div id="choosenblock">
+			<span class="title_ch">Choosen block:</span>
+			<input type="number" value="0" id="ch_x" class="ch_input" onchange="change_choosen_block();">
+			<input type="number" value="0" id="ch_y" class="ch_input" onchange="change_choosen_block();">
+			<input type="number" value="0" id="ch_z" class="ch_input" onchange="change_choosen_block();">
+		</div>
+		<div id="saved_color_list">
+		<span class="title_ch">Color List:</span>
+		</div>
+		<div class="title_ch" id="direction_toggle">
+			<span>X and Y direction ?</span><br>
+				<input type="radio" name="dir" value="y" onchange="change_dir(this.value);" checked>Y<br>
+				<input type="radio" name="dir" value="xandy" onchange="change_dir(this.value);">X and Y<br>
+				<input type="checkbox" value="" onchange="is_one_layer_mode=!is_one_layer_mode;">one layer mod<br>
+		</div>
+	</div>
+</body>
+</html>
